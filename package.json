@@ -1,0 +1,10 @@
+{
+  "name": "railway-connect",
+  "version": "1.0.0",
+  "description": "Claude Code skill that connects Claude to Railway — CLI, official MCP server, and one sign-in link for the user",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "test": "node tests/run-tests.mjs"
+  }
+}

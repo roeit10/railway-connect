@@ -1,0 +1,22 @@
+# מפתחות וטוקנים — לעולם לא
+.env
+.railway/
+railway-config.json
+
+# הדאטה של המשתמש
+context/
+outputs/
+.cache/
+
+# תיקיית הצילום — לא חלק מהחבילה
+demo/
+.filming/
+
+# מערכת
+.DS_Store
+node_modules/
+
+# תכנון ותסריט — פנימי, לא לריפו הציבורי
+PLAN.md
+*תסריט*.md
+*סדר-צילום*.md
