@@ -99,10 +99,27 @@ if (linkFound) {
 
 // ---------- 4. doctor.sh ----------
 section('4. doctor.sh');
+
+// תקציב זמן. הגרסה הראשונה של הבדיקה קראה ל-`claude mcp list`, שמריץ בדיקת
+// בריאות מול כל שרתי ה-MCP של המשתמש — ונתקעה לנצח בגלל שרת אחר שלא קשור
+// אלינו. בדיקת מוכנות שנתקעת גרועה מבדיקה שנכשלת, ולכן זו בדיקת רגרסיה.
+const DOCTOR_BUDGET_MS = 20000;
+
 try {
   let out = '', code = 0;
-  try { out = sh('bash', [DOCTOR]); }
-  catch (e) { out = (e.stdout || '') + (e.stderr || ''); code = e.status ?? 1; }
+  const t0 = Date.now();
+  try { out = sh('bash', [DOCTOR], { timeout: DOCTOR_BUDGET_MS }); }
+  catch (e) {
+    out = (e.stdout || '') + (e.stderr || '');
+    code = e.status ?? 1;
+    if (e.killed || e.signal) {
+      fail(`doctor.sh לא סיים תוך ${DOCTOR_BUDGET_MS / 1000} שניות — כנראה נתקע על קריאה חיצונית`);
+    }
+  }
+  const elapsed = Date.now() - t0;
+  elapsed < DOCTOR_BUDGET_MS
+    ? pass(`סיים ב-${(elapsed / 1000).toFixed(1)} שניות`)
+    : fail(`לקח ${(elapsed / 1000).toFixed(1)} שניות`);
 
   out.includes('NEXT:')
     ? pass('מדפיס שורת NEXT')

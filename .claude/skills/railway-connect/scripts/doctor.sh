@@ -62,25 +62,43 @@ fi
 # ---------- 3. ה-MCP ב-Claude Code ----------
 s "3. ה-MCP ב-Claude Code"
 
-MCP_FOUND=0
-if command -v claude >/dev/null 2>&1; then
-  if claude mcp list 2>/dev/null | grep -qiE '^railway:'; then
-    MCP_FOUND=1
-    if claude mcp list 2>/dev/null | grep -iE '^railway:' | grep -q '✔'; then
-      g "רשום ומחובר"
-    else
-      y "רשום אבל לא מחובר — בדרך כלל צריך להפעיל מחדש את Claude Code"
-    fi
-  fi
-else
-  # אין CLI של claude — נופלים לחיפוש בקונפיג
-  for f in "$HOME/.claude.json" ".mcp.json"; do
-    [ -f "$f" ] && grep -q '"railway"' "$f" 2>/dev/null && MCP_FOUND=1
-  done
-  [ "$MCP_FOUND" = 1 ] && g "רשום (נמצא בקונפיג)"
-fi
+# ⛔ לא משתמשים ב-'claude mcp list'. הוא מריץ בדיקת בריאות מול כל שרתי
+# ה-MCP של המשתמש, ולכן הוא איטי ויכול להיתקע לגמרי בגלל שרת אחר שלא
+# קשור אלינו. בדיקת מוכנות שנתקעת גרועה מבדיקה שנכשלת.
+# קוראים את הקונפיג ישירות — מיידי ודטרמיניסטי.
 
-if [ "$MCP_FOUND" = 0 ]; then
+MCP_FOUND=0
+MCP_WHERE=""
+
+check_cfg() {
+  [ -f "$1" ] || return 1
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "$1" <<'PYEOF' >/dev/null 2>&1
+import json,sys
+try:
+    d=json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(1)
+if 'railway' in (d.get('mcpServers') or {}):
+    sys.exit(0)
+for proj in (d.get('projects') or {}).values():
+    if isinstance(proj,dict) and 'railway' in (proj.get('mcpServers') or {}):
+        sys.exit(0)
+sys.exit(1)
+PYEOF
+  else
+    grep -q '"railway"' "$1" 2>/dev/null
+  fi
+}
+
+for cfg in "$HOME/.claude.json" ".mcp.json" ".claude/settings.json"; do
+  if check_cfg "$cfg"; then MCP_FOUND=1; MCP_WHERE="$cfg"; break; fi
+done
+
+if [ "$MCP_FOUND" = 1 ]; then
+  g "רשום — $MCP_WHERE"
+  y "אם הכלים לא מופיעים בקלוד, צריך להפעיל אותו מחדש"
+else
   r "ה-MCP לא רשום"
   missing+=("mcp")
 fi
