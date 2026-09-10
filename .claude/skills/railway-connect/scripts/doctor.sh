@@ -13,6 +13,7 @@ set -uo pipefail
 
 MIN_VERSION="5.44.0"
 missing=()
+optional=()
 
 g() { printf '\033[32m✅\033[0m %s\n' "$1"; }
 r() { printf '\033[31m❌\033[0m %s\n' "$1"; }
@@ -103,8 +104,31 @@ else
   missing+=("mcp")
 fi
 
-# ---------- 4. התיקייה הזאת ----------
-s "4. התיקייה הזאת"
+# ---------- 4. גיטהאב (אופציונלי) ----------
+s "4. גיטהאב"
+
+# לא חוסם. נדרש רק לפריסה אוטומטית מריפו — ראה references/github.md.
+if ! command -v gh >/dev/null 2>&1; then
+  y "gh לא מותקן — נדרש רק אם רוצים ש-git push יפרוס"
+  optional+=("gh-install")
+elif ! gh auth status >/dev/null 2>&1; then
+  y "gh מותקן אבל לא מחובר — נדרש רק לפריסה מריפו"
+  optional+=("gh-login")
+else
+  GH_USER="$(gh auth status --active 2>&1 | grep -oE "account [A-Za-z0-9_-]+" | head -1 | sed 's/account //')"
+  g "מחובר — ${GH_USER:-חשבון מזוהה}"
+  # ⚠️ --active הכרחי. בלעדיו הבדיקה סורקת את הפלט של כל החשבונות, וחשבון
+  # שני עם workflow ייתן חיווי ירוק שקרי לחשבון הפעיל שאין לו אותו.
+  if gh auth status --active 2>&1 | grep -i "token scopes" | grep -q "'workflow'"; then
+    g "יש הרשאת workflow"
+  else
+    y "אין הרשאת workflow — דחיפת .github/workflows תידחה. תיקון: gh auth refresh -h github.com -s workflow"
+    optional+=("gh-workflow-scope")
+  fi
+fi
+
+# ---------- 5. התיקייה הזאת ----------
+s "5. התיקייה הזאת"
 
 if [ -z "$RAILWAY" ] || [ ${#missing[@]} -gt 0 ]; then
   printf '⏭️  מדלג — קודם מסיימים את החיבור\n'
@@ -124,6 +148,10 @@ printf '\n%s\n' "─────────────────────
 
 if [ ${#missing[@]} -eq 0 ]; then
   printf '\033[32m\033[1mRailway מחובר. אפשר לפרוס.\033[0m\n'
+  if [ ${#optional[@]} -gt 0 ]; then
+    printf '\033[33mפתוח (לא חוסם):\033[0m %s\n' "${optional[*]}"
+    printf '   פריסה אוטומטית מריפו תדרוש את זה — ראה references/github.md\n'
+  fi
   echo "NEXT: READY"
   exit 0
 fi

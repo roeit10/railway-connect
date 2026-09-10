@@ -97,8 +97,46 @@ if (linkFound) {
        'הפורמט השתנה, או שהפקודה לא הדפיסה כלום. references/auth.md צריך עדכון');
 }
 
-// ---------- 4. doctor.sh ----------
-section('4. doctor.sh');
+// ---------- 4. הקוד והלינק של גיטהאב ----------
+section('4. גיטהאב');
+
+// GH_CONFIG_DIR מפנה את gh לתיקייה זמנית, ולכן הבדיקה לא נוגעת בהזדהות
+// האמיתית של מי שמריץ אותה. חובה — אחרת נריץ login על חשבון חי.
+const GH_CODE_RE = /one-time code:\s*([A-Z0-9-]+)/;
+const GH_URL_RE = /https:\/\/github\.com\/login\/device/;
+
+let ghPresent = true;
+try { sh('gh', ['--version']); pass('gh מותקן'); }
+catch { ghPresent = false; console.log('  skip gh לא מותקן — מדלג'); }
+
+if (ghPresent) {
+  const throwaway = mkdtempSync(join(tmpdir(), 'gh-throwaway-'));
+  const out = await new Promise((resolve) => {
+    let buf = '', done = false;
+    const p = spawn('gh',
+      ['auth', 'login', '--hostname', 'github.com', '--git-protocol', 'https', '--web', '--scopes', 'repo,workflow'],
+      { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, GH_CONFIG_DIR: throwaway } });
+    const finish = (v) => { if (!done) { done = true; try { p.kill(); } catch {} resolve(v); } };
+    const onData = (d) => { buf += d.toString(); if (GH_CODE_RE.test(buf) && GH_URL_RE.test(buf)) finish(buf); };
+    p.stdout.on('data', onData); p.stderr.on('data', onData);
+    p.on('error', () => finish(null));
+    setTimeout(() => finish(buf || null), 25000);
+  });
+
+  if (out && GH_CODE_RE.test(out)) pass(`הקוד נתפס: ${out.match(GH_CODE_RE)[1].slice(0, 2)}…`);
+  else fail('לא נמצא one-time code בפלט של gh auth login', 'הפורמט השתנה — references/github.md צריך עדכון');
+
+  if (out && GH_URL_RE.test(out)) pass('הלינק github.com/login/device נתפס');
+  else fail('לא נמצא הלינק בפלט של gh auth login');
+
+  // ההבדל מ-Railway. אם גיטהאב יטמיע קוד ב-URL, ההגשה בסקיל צריכה להשתנות.
+  if (out && /login\/device\?[^\s]*code=/.test(out))
+    fail('גיטהאב מטמיע קוד ב-URL — לעדכן את github.md להגשה בקליק אחד');
+  else pass('הקוד נפרד מה-URL — שני צעדים, כמתועד');
+}
+
+// ---------- 5. doctor.sh ----------
+section('5. doctor.sh');
 
 // תקציב זמן. הגרסה הראשונה של הבדיקה קראה ל-`claude mcp list`, שמריץ בדיקת
 // בריאות מול כל שרתי ה-MCP של המשתמש — ונתקעה לנצח בגלל שרת אחר שלא קשור
